@@ -75,6 +75,10 @@
 #endif
 
 static void uv__run_pending(uv_loop_t* loop);
+static void uv__signal_thread_proc(void *arg);
+
+static int uv__sanitize_signals_done;
+static uv_thread_t uv__signal_thread;
 
 /* Verify that uv_buf_t is ABI-compatible with struct iovec. */
 STATIC_ASSERT(sizeof(uv_buf_t) == sizeof(struct iovec));
@@ -662,6 +666,29 @@ void uv_disable_stdio_inheritance(void) {
 }
 
 
+void uv_sanitize_signal_handling(void) {
+  sigset_t full_ss;
+  sigset_t old_ss;
+
+  /* Don't do it twice.
+   * This looks like a race condition but then it should only be
+   * called from main. */
+  if (uv__sanitize_signals_done) {
+    return;
+  }
+  uv__sanitize_signals_done = 1;
+
+  // Create dummy signal handling thread.
+  if (uv_thread_create(&uv__signal_thread, uv__signal_thread_proc, NULL))
+    abort();
+
+  /* Block all signals in the current (main) thread. */
+  sigfillset(&full_ss);
+  if (pthread_sigmask(SIG_SETMASK, &full_ss, &old_ss))
+    abort();
+}
+
+
 static void uv__run_pending(uv_loop_t* loop) {
   QUEUE* q;
   uv__io_t* w;
@@ -944,5 +971,13 @@ int uv__dup2_cloexec(int oldfd, int newfd) {
     }
 
     return r;
+  }
+}
+
+
+static void uv__signal_thread_proc(void* arg) {
+  /* Handle signals by doing nothing. */
+  while (1) {
+      pause();
   }
 }

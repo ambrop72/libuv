@@ -456,3 +456,6 @@ int uv__socket_sockopt(uv_handle_t* handle, int optname, int* value) {
 
   return 0;
 }
+
+void uv_sanitize_signal_handling(void) {
+}

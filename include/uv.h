@@ -2252,6 +2252,30 @@ UV_EXTERN extern uint64_t uv_hrtime(void);
 UV_EXTERN void uv_disable_stdio_inheritance(void);
 
 /*
+ * On Unix, this function can be called early from main, before any threads
+ * are started, to set up a safe environment with respect to signal handling.
+ * 
+ * This function does the following when it is called for the first time:
+ * - Starts a dummy thread, which consists of an infinite pause() loop.
+ * - Blocks all signals in the current thread.
+ * 
+ * Remember that signal masks are thread-specific and inherited at thread
+ * creation. Therefore the dummy thread will have the same signals unblocked
+ * as the main thread did when this function was called.
+ * 
+ * This will ensure that signals directed at the process will only be processed
+ * by this dummy thread. Most imporantly, system calls will not randomly fail
+ * with EINTR errors (unless signals are later unmasked by threads...).
+ * 
+ * Calling this function is not necessary for libuv itself to operate
+ * correctly, since EINTR is handled by retrying calls. But code outside
+ * of libuv may not be handling EINTR.
+ * 
+ * This function does nothing on Windows.
+ */
+UV_EXTERN void uv_sanitize_signal_handling(void);
+
+/*
  * Opens a shared library. The filename is in utf-8. Returns 0 on success and
  * -1 on error. Call uv_dlerror(uv_lib_t*) to get the error message.
  */
